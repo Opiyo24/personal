@@ -1,15 +1,20 @@
 #include "one.h"
 
 /**
- * 
+* main - entry point. Implementation of
+* the simple shell
+*
+* Return: 0 on success
 */
 
-int main() {
-    char *env[] = {NULL}; // You should provide the environment variables for execve
+int main(void)
+{
+	char *env[] = {NULL};
 
-    while (1) {
-        simple_shell(env);
-    }
+	while (1)
+	{
+		simple_shell(env);
+	}
 
-    return 0;
+	return (0);
 }
