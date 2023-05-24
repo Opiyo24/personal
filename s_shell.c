@@ -17,7 +17,7 @@ void simple_shell(char **env) {
         parse_command(cmd, vector);
 
         if (vector[0] == NULL) {
-            write(STDERR_FILENO, "No such file or directory!\n", 28);
+            write(STDERR_FILENO, "No such file or directory\n", 27);
             free(cmd);
             return;
         }

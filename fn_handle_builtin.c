@@ -12,7 +12,7 @@ void handle_builtin(char **vector, char **env) {
             execute_command(command_path, vector, env);
             free(command_path);
         } else {
-            write(STDERR_FILENO, "No such file or repository!\n", 29);
+            write(STDERR_FILENO, "No such file or directory\n", 27);
         }
     }
 }
