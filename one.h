@@ -17,13 +17,13 @@
 #define MAX_COMMAND 100
 #define MAX_ARGS 10
 
-void prompt();
+void prompt(void);
 void parse_command(char *command, char **vector);
 char *get_command_path(char *cmd);
 void execute_command(char *cmd, char **args, char **env);
 int fn_atoi(const char *str);
 void fn_exit(char **args);
-void handle_env();
+void handle_env(void);
 void handle_builtin(char **vector, char **env);
 ssize_t my_getline(char **lineptr, size_t *n, FILE *stream);
 void simple_shell(char **env);
