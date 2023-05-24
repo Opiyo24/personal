@@ -1,0 +1,199 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <signal.h>
+
+#define MAX_COMMAND 100
+
+void prompt() {
+    if (isatty(STDIN_FILENO)) {
+        write(STDOUT_FILENO, "Cisfun$ ", 9);
+        fflush(stdout);
+    }
+}
+
+void parse_command(char *command, char **vector) {
+    int i = 0;
+    char *token = fn_strtok(command, " ");
+    while (token != NULL) {
+        vector[i++] = token;
+        token = fn_strtok(NULL, " ");
+    }
+    vector[i] = NULL;
+}
+
+char *get_command_path(char *cmd) {
+    char *path = getenv("PATH");
+    char *token = fn_strtok(path, ":");
+
+    while (token != NULL) {
+        char command_path[MAX_COMMAND];
+        snprintf(command_path, sizeof(command_path), "%s/%s", token, cmd);
+        if (access(command_path, X_OK) == 0) {
+            return my_strdup(command_path);
+        }
+        token = fn_strtok(NULL, ":");
+    }
+
+    return NULL;
+}
+
+void execute_command(char *cmd, char **args, char **env) {
+    pid_t child_pid = fork();
+
+    if (child_pid == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    if (child_pid == 0) {
+        if (execve(cmd, args, env) == -1) {
+            perror("execve");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        int status;
+        waitpid(child_pid, &status, 0);
+    }
+}
+
+int fn_atoi(const char *str) {
+    int sign = 1;
+    int result = 0;
+    int i = 0;
+
+    // Check for sign
+    if (str[0] == '-') {
+        sign = -1;
+        i++;
+    } else if (str[0] == '+') {
+        i++;
+    }
+
+    // Process digits
+    while (str[i] != '\0') {
+        if (str[i] >= '0' && str[i] <= '9') {
+            result = result * 10 + (str[i] - '0');
+            i++;
+        } else {
+            break;  // Stop processing if non-digit character encountered
+        }
+    }
+
+    return sign * result;
+}
+
+void fn_exit(char **args) {
+    if (args[1] != NULL) {
+        int status = fn_atoi(args[1]);
+        exit(status);
+    } else {
+        exit(EXIT_SUCCESS);
+    }
+}
+
+void handle_env() {
+    extern char **environ;
+
+    char **env = environ;
+    while (*env != NULL) {
+        size_t len = strlen(*env);
+        write(STDOUT_FILENO, *env, len);
+        write(STDOUT_FILENO, "\n", 1);
+        env++;
+    }
+}
+
+void handle_builtin(char **vector, char **env) {
+    if (strcmp(vector[0], "exit") == 0) {
+        fn_exit(vector);
+    } else if (strcmp(vector[0], "env") == 0) {
+        handle_env();
+    } else {
+        // Handle other built-in commands here if needed
+        char *command_path = get_command_path(vector[0]);
+        if (command_path != NULL) {
+            execute_command(command_path, vector, env);
+            free(command_path);
+        } else {
+            write(STDERR_FILENO, "No such file or repository!\n", 29);
+        }
+    }
+}
+
+ssize_t my_getline(char **lineptr, size_t *n, FILE *stream) {
+    ssize_t bytesRead = 0;
+    size_t currentPosition = 0;
+    int isNewLine = 0;
+    int c;
+
+    if (*lineptr == NULL || *n == 0) {
+        *n = BUFSIZ;
+        *lineptr = malloc(*n);
+        if (*lineptr == NULL) {
+            return -1;
+        }
+    }
+
+    while ((c = getc(stream)) != EOF) {
+        if (currentPosition >= *n - 1) {
+            *n += BUFSIZ;
+            char *newLineptr = realloc(*lineptr, *n);
+            if (newLineptr == NULL) {
+                return -1;
+            }
+            *lineptr = newLineptr;
+        }
+
+        (*lineptr)[currentPosition++] = c;
+
+        if (c == '\n') {
+            isNewLine = 1;
+            break;
+        }
+    }
+
+    (*lineptr)[currentPosition] = '\0';
+    bytesRead = currentPosition;
+
+    if (bytesRead == 0 && !isNewLine) {
+        return -1;
+    }
+
+    return bytesRead;
+}
+
+void simple_shell(char **env) {
+    char *cmd = NULL;
+    size_t cmd_len = 0;
+    ssize_t cmd_char;
+
+    prompt();
+
+    cmd_char = my_getline(&cmd, &cmd_len, stdin); // Read command passed to prompt
+    if (cmd_char > 0) {
+        if (cmd[cmd_char - 1] == '\n') {
+            cmd[cmd_char - 1] = '\0'; // Remove the trailing newline character
+        }
+
+        char *vector[MAX_COMMAND];
+        parse_command(cmd, vector);
+
+        if (vector[0] == NULL) {
+            write(STDERR_FILENO, "No such file or directory!\n", 28);
+            free(cmd);
+            return;
+        }
+
+        handle_builtin(vector, env);
+    } else {
+        free(cmd);
+        exit(EXIT_FAILURE);
+    }
+    free(cmd);
+}
